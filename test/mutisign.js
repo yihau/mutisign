@@ -25,6 +25,47 @@ describe("Multisign", () => {
     })
   })
 
+  describe("Add Owner", () => {
+    let multisign
+    let addr1
+    let addr2
+    let addr3
+    let addr4
+    let addr5
+    beforeEach(async function () {
+      [addr1, addr2, addr3, addr4, addr5] = await ethers.getSigners()
+      multisign = await (await ethers.getContractFactory("Multisign")).deploy([addr1.address, addr2.address, addr3.address], 2)
+    })
+
+    it("should revert when nominee is not in owner group", async () => {
+      await expect(multisign.connect(addr4).addOwner(addr5.address)).
+        to.be.revertedWith("only owners can do this")
+    })
+    it("should revert when candidate is in owner group", async () => {
+      await expect(multisign.connect(addr3).addOwner(addr2.address)).
+        to.be.revertedWith("already is one of owner")
+    })
+    it("should add a candidate", async () => {
+      await expect(multisign.connect(addr3).addOwner(addr5.address)).
+        to.emit(multisign, 'NominateAddedOwner').withArgs(addr3.address, addr5.address)
+      expect(await multisign.getAddCandidateSignerCount(addr5.address)).to.be.equal(1)
+    })
+    it("should add a owner", async () => {
+      await expect(multisign.connect(addr3).addOwner(addr5.address)).
+        to.emit(multisign, 'NominateAddedOwner').withArgs(addr3.address, addr5.address)
+      expect(await multisign.getAddCandidateSignerCount(addr5.address)).to.be.equal(1)
+      await expect(multisign.connect(addr2).addOwner(addr5.address)).
+        to.emit(multisign, "AddOwner").withArgs(addr5.address)
+      expect(await multisign.getAddCandidateSignerCount(addr5.address)).to.be.equal(0)
+      expect(await multisign.owners(addr5.address)).to.be.equal(true)
+    })
+    it("should revert when nominate same candidate twice by same owner", async () => {
+      await multisign.connect(addr3).addOwner(addr5.address)
+      await expect(multisign.connect(addr3).addOwner(addr5.address)).
+        to.be.revertedWith("already nominate this candidate")
+    })
+  })
+
   describe("ETH", () => {
     let multisign
     let addr1
