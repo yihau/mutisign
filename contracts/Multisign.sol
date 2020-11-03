@@ -10,10 +10,17 @@ contract Multisign {
     event ReceiveETH(address indexed sender, uint256 indexed num);
     event NominateAddedOwner(address indexed sender, address indexed candidate);
     event AddOwner(address indexed candidate);
+    event NominateRemoveOwner(
+        address indexed sender,
+        address indexed candidate
+    );
+    event RemoveOwner(address indexed candidate);
 
     mapping(address => Candidate) addCandidates;
+    mapping(address => Candidate) removeCandidates;
 
     uint8 public requireMinimum;
+    uint256 public ownersCount;
     mapping(address => bool) public owners;
 
     constructor(address[] memory initOwners, uint8 initMinimumRequired) public {
@@ -24,6 +31,7 @@ contract Multisign {
         for (uint256 i = 0; i < initOwners.length; i++) {
             owners[initOwners[i]] = true;
         }
+        ownersCount = initOwners.length;
         requireMinimum = initMinimumRequired;
     }
 
@@ -43,9 +51,38 @@ contract Multisign {
         if (addCandidates[addr].signerCount >= requireMinimum) {
             delete addCandidates[addr];
             owners[addr] = true;
+            ownersCount++;
             emit AddOwner(addr);
         } else {
             addCandidates[addr].signed[msg.sender] = true;
+        }
+    }
+
+    function getRemoveCandidateSignerCount(address addr)
+        external
+        view
+        returns (uint8)
+    {
+        return removeCandidates[addr].signerCount;
+    }
+
+    function removeOwner(address addr) external {
+        require(owners[msg.sender], "only owners can do this");
+        require(owners[addr], "address is not one of owner");
+        require(
+            !removeCandidates[addr].signed[msg.sender],
+            "already nominate this candidate"
+        );
+        require(ownersCount > requireMinimum, "owner not enough");
+        emit NominateRemoveOwner(msg.sender, addr);
+        removeCandidates[addr].signerCount++;
+        if (removeCandidates[addr].signerCount >= requireMinimum) {
+            delete removeCandidates[addr];
+            delete owners[addr];
+            ownersCount--;
+            emit RemoveOwner(addr);
+        } else {
+            removeCandidates[addr].signed[msg.sender] = true;
         }
     }
 
