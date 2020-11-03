@@ -2,6 +2,8 @@ const { use, expect } = require("chai")
 const { solidity } = require("ethereum-waffle")
 use(solidity)
 
+const zeroAddress = "0x0000000000000000000000000000000000000000";
+
 describe("Multisign", () => {
 
   describe("Contract Init", () => {
@@ -116,7 +118,7 @@ describe("Multisign", () => {
     })
   })
 
-  describe("Transfer", () => {
+  describe("Transfer ETH", () => {
     let multisign
     let addr1
     let addr2
@@ -127,22 +129,49 @@ describe("Multisign", () => {
       multisign = await (await ethers.getContractFactory("Multisign")).deploy([addr1.address, addr2.address, addr3.address], 2)
     })
     it("should revert when not owner try to transfer", async () => {
-      await expect(multisign.connect(addr4).transfer(addr4.address, 100)).
+      await expect(multisign.connect(addr4).transfer(addr4.address, 100, zeroAddress)).
         to.be.revertedWith("only owners can do this")
     })
     it("should revert when contract balance not enough", async () => {
-      await expect(multisign.connect(addr1).transfer(addr4.address, 100)).
+      await expect(multisign.connect(addr1).transfer(addr4.address, 100, zeroAddress)).
         to.be.revertedWith("balance not enough")
     })
     it("should add a tx", async () => {
       await addr1.sendTransaction({ to: multisign.address, value: 100 })
-      await expect(multisign.connect(addr1).transfer(addr4.address, 100)).
-        to.emit(multisign, 'BuildETHTx').withArgs(addr1.address, 1)
+      await expect(multisign.connect(addr1).transfer(addr4.address, 100, zeroAddress)).
+        to.emit(multisign, 'BuildTx').withArgs(addr1.address, 1)
       let tx = await multisign.getTx(1)
       expect(tx.to).to.equal(addr4.address)
       expect(tx.value).to.equal(100)
       expect(tx.send).to.equal(false)
       expect(tx.signerCount).to.equal(1)
+      expect(tx.token).to.equal(zeroAddress)
+    })
+  })
+
+  describe("Transfer ERC20Token", () => {
+    let multisign
+    let token
+    let addr1
+    let addr2
+    let addr3
+    let addr4
+    beforeEach(async function () {
+      [addr1, addr2, addr3, addr4] = await ethers.getSigners()
+      token = await (await ethers.getContractFactory("Token")).deploy("USDT", "USDT", 0, 100000)
+      multisign = await (await ethers.getContractFactory("Multisign")).deploy([addr1.address, addr2.address, addr3.address], 2)
+    })
+    it("should add a tx", async () => {
+      await addr1.sendTransaction({ to: multisign.address, value: 100 })
+      await token.connect(addr1).transfer(multisign.address, 100)
+      await expect(multisign.connect(addr1).transfer(addr4.address, 100, token.address)).
+        to.emit(multisign, 'BuildTx').withArgs(addr1.address, 1)
+      let tx = await multisign.getTx(1)
+      expect(tx.to).to.equal(addr4.address)
+      expect(tx.value).to.equal(100)
+      expect(tx.send).to.equal(false)
+      expect(tx.signerCount).to.equal(1)
+      expect(tx.token).to.equal(token.address)
     })
   })
 
@@ -156,7 +185,7 @@ describe("Multisign", () => {
       [addr1, addr2, addr3, addr4] = await ethers.getSigners()
       multisign = await (await ethers.getContractFactory("Multisign")).deploy([addr1.address, addr2.address, addr3.address], 2)
       await addr1.sendTransaction({ to: multisign.address, value: 100 })
-      await multisign.connect(addr1).transfer(addr4.address, 100)
+      await multisign.connect(addr1).transfer(addr4.address, 100, zeroAddress)
     })
     it("should revert when not owner try to confirm", async () => {
       await expect(multisign.connect(addr4).confirmTx(1)).
@@ -172,15 +201,35 @@ describe("Multisign", () => {
     })
     it("should emit approve event", async () => {
       await expect(multisign.connect(addr2).confirmTx(1)).
-        to.emit(multisign, 'ApproveETHTx').withArgs(addr2.address, 1)
+        to.emit(multisign, 'ApproveTx').withArgs(addr2.address, 1)
     })
     it("should emit send event", async () => {
       await expect(multisign.connect(addr2).confirmTx(1)).
-        to.emit(multisign, 'SendETHTx').withArgs(addr2.address, 1)
+        to.emit(multisign, 'SendTx').withArgs(addr2.address, 1)
     })
     it("balance should match", async () => {
       await expect(() => multisign.connect(addr2).confirmTx(1)).
         to.be.changeEtherBalances([multisign, addr4], [-100, 100])
+    })
+  })
+
+  describe("Confirm ERC20 Tx", () => {
+    let multisign
+    let token
+    let addr1
+    let addr2
+    let addr3
+    let addr4
+    beforeEach(async function () {
+      [addr1, addr2, addr3, addr4] = await ethers.getSigners()
+      token = await (await ethers.getContractFactory("Token")).deploy("USDT", "USDT", 0, 100000)
+      multisign = await (await ethers.getContractFactory("Multisign")).deploy([addr1.address, addr2.address, addr3.address], 2)
+      await token.connect(addr1).transfer(multisign.address, 100)
+      await multisign.connect(addr1).transfer(addr4.address, 100, token.address)
+    })
+    it("balance should match", async () => {
+      await expect(() => multisign.connect(addr2).confirmTx(1)).
+        to.be.changeTokenBalances(token, [multisign, addr4], [-100, 100])
     })
   })
 

@@ -1,6 +1,7 @@
 devDependencies:
   '@nomiclabs/hardhat-ethers': 2.0.0_hardhat@2.0.2
   '@nomiclabs/hardhat-waffle': 2.0.0_09daaa1b4795899723e66d37cd717aa5
+  '@openzeppelin/contracts': 3.2.0
   chai: 4.2.0
   ethereum-waffle: 3.2.0
   hardhat: 2.0.2
@@ -441,6 +442,10 @@ packages:
       hardhat: ^2.0.0
     resolution:
       integrity: sha512-CnG9JC0rgqa68LTgyETxBUEWYAovvNGVs5abqaXjG80eF7iMLjDjM8IjOM87siAaxaxFCf6VBMJmtueqVq7jZw==
+  /@openzeppelin/contracts/3.2.0:
+    dev: true
+    resolution:
+      integrity: sha512-bUOmkSoPkjnUyMiKo6RYnb0VHBk5D9KKDAgNLzF41aqAM3TeE0yGdFF5dVRcV60pZdJLlyFT/jjXIZCWyyEzAQ==
   /@resolver-engine/core/0.3.3:
     dependencies:
       debug: 3.2.6
@@ -7256,6 +7261,7 @@ packages:
 specifiers:
   '@nomiclabs/hardhat-ethers': ^2.0.0
   '@nomiclabs/hardhat-waffle': ^2.0.0
+  '@openzeppelin/contracts': ^3.2.0
   chai: ^4.2.0
   ethereum-waffle: ^3.2.0
   hardhat: ^2.0.0
