@@ -115,6 +115,75 @@ describe("Multisign", () => {
         to.be.revertedWith("already nominate this candidate")
     })
   })
+
+  describe("Transfer", () => {
+    let multisign
+    let addr1
+    let addr2
+    let addr3
+    let addr4
+    beforeEach(async function () {
+      [addr1, addr2, addr3, addr4] = await ethers.getSigners()
+      multisign = await (await ethers.getContractFactory("Multisign")).deploy([addr1.address, addr2.address, addr3.address], 2)
+    })
+    it("should revert when not owner try to transfer", async () => {
+      await expect(multisign.connect(addr4).transfer(addr4.address, 100)).
+        to.be.revertedWith("only owners can do this")
+    })
+    it("should revert when contract balance not enough", async () => {
+      await expect(multisign.connect(addr1).transfer(addr4.address, 100)).
+        to.be.revertedWith("balance not enough")
+    })
+    it("should add a tx", async () => {
+      await addr1.sendTransaction({ to: multisign.address, value: 100 })
+      await expect(multisign.connect(addr1).transfer(addr4.address, 100)).
+        to.emit(multisign, 'BuildETHTx').withArgs(addr1.address, 1)
+      let tx = await multisign.getTx(1)
+      expect(tx.to).to.equal(addr4.address)
+      expect(tx.value).to.equal(100)
+      expect(tx.send).to.equal(false)
+      expect(tx.signerCount).to.equal(1)
+    })
+  })
+
+  describe("Confirm Tx", () => {
+    let multisign
+    let addr1
+    let addr2
+    let addr3
+    let addr4
+    beforeEach(async function () {
+      [addr1, addr2, addr3, addr4] = await ethers.getSigners()
+      multisign = await (await ethers.getContractFactory("Multisign")).deploy([addr1.address, addr2.address, addr3.address], 2)
+      await addr1.sendTransaction({ to: multisign.address, value: 100 })
+      await multisign.connect(addr1).transfer(addr4.address, 100)
+    })
+    it("should revert when not owner try to confirm", async () => {
+      await expect(multisign.connect(addr4).confirmTx(1)).
+        to.be.revertedWith("only owners can do this")
+    })
+    it("should revert when tx not exist", async () => {
+      await expect(multisign.connect(addr2).confirmTx(2)).
+        to.be.revertedWith("tx is no exist")
+    })
+    it("should revert when already confirm", async () => {
+      await expect(multisign.connect(addr1).confirmTx(1)).
+        to.be.revertedWith("already signed")
+    })
+    it("should emit approve event", async () => {
+      await expect(multisign.connect(addr2).confirmTx(1)).
+        to.emit(multisign, 'ApproveETHTx').withArgs(addr2.address, 1)
+    })
+    it("should emit send event", async () => {
+      await expect(multisign.connect(addr2).confirmTx(1)).
+        to.emit(multisign, 'SendETHTx').withArgs(addr2.address, 1)
+    })
+    it("balance should match", async () => {
+      await expect(() => multisign.connect(addr2).confirmTx(1)).
+        to.be.changeEtherBalances([multisign, addr4], [-100, 100])
+    })
+  })
+
   describe("ETH", () => {
     let multisign
     let addr1
